@@ -1,0 +1,112 @@
+# 1. ARRÊTER LE PUSH (Ctrl+C si pas déjà fait)
+
+# 2. Aller dans votre dossier
+
+
+# 3. Créer un .gitignore COMPLET
+# Environnements virtuels
+venv/
+env/
+.venv/
+ENV/
+*/venv/
+**/venv/
+*.virtualenv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyTorch models
+*.pt
+*.pth
+*.ckpt
+
+# HDF5 files
+*.h5
+*.hdf5
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# MLflow
+mlruns/
+mlartifacts/
+autosci_pipeline/mlruns/
+autosci_pipeline/mlartifacts/
+
+# Models folders
+models/
+*/models/
+**/models/
+deployed_models/
+downloaded_models/
+
+# Data
+*.csv
+*.xlsx
+*.json
+data/
+datasets/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Jupyter
+.ipynb_checkpoints/
+EOF
+
+# 4. Supprimer les fichiers du cache Git (PAS du disque)
+git rm -r --cached venv/
+git rm -r --cached */venv/
+git rm -r --cached **/venv/
+git rm -r --cached mlruns/
+git rm -r --cached mlartifacts/
+git rm -r --cached autosci_pipeline/mlruns/
+git rm -r --cached autosci_pipeline/mlartifacts/
+git rm -r --cached models/
+git rm -r --cached */models/
+git rm -r --cached autosci_pipeline/models/
+git rm -r --cached autosci_pipeline/deployed_models/
+git rm -r --cached autosci_pipeline/downloaded_models/
+git rm -r --cached media_intelligence_platform/venv/
+
+# 5. Commit le nettoyage
+git add .gitignore
+git commit -m "Clean repository: remove venv, models, and large files"
+
+# 6. Push SEULEMENT ce commit
+git push -u origin master
+
+

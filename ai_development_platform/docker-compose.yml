@@ -1,0 +1,199 @@
+version: '3.8'
+
+services:
+  # API Backend
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai_dev_api
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://aidev:aidev123@postgres:5432/aidevdb
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AWS_ACCESS_KEY=${AWS_ACCESS_KEY}
+      - AWS_SECRET_KEY=${AWS_SECRET_KEY}
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+      - api_data:/app/data
+    restart: unless-stopped
+    networks:
+      - ai_dev_network
+    command: uvicorn ai_development_platform_api:app --host 0.0.0.0 --port 8001 --reload
+
+  # Frontend Streamlit
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ai_dev_frontend
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8001
+    depends_on:
+      - api
+    volumes:
+      - ./frontend:/app
+    restart: unless-stopped
+    networks:
+      - ai_dev_network
+    command: streamlit run ai_development_platform_frontend.py --server.port=8501 --server.address=0.0.0.0
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai_dev_postgres
+    environment:
+      - POSTGRES_USER=aidev
+      - POSTGRES_PASSWORD=aidev123
+      - POSTGRES_DB=aidevdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - ai_dev_network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ai_dev_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - ai_dev_network
+    command: redis-server --appendonly yes
+
+  # Celery Worker (pour tâches asynchrones)
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai_dev_celery
+    environment:
+      - DATABASE_URL=postgresql://aidev:aidev123@postgres:5432/aidevdb
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+    networks:
+      - ai_dev_network
+    command: celery -A tasks worker --loglevel=info
+
+  # Flower (monitoring Celery)
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai_dev_flower
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - celery_worker
+    restart: unless-stopped
+    networks:
+      - ai_dev_network
+    command: celery -A tasks flower --port=5555
+
+  # Nginx (Reverse Proxy)
+  nginx:
+    image: nginx:alpine
+    container_name: ai_dev_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+      - frontend
+    restart: unless-stopped
+    networks:
+      - ai_dev_network
+
+  # Prometheus (Monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ai_dev_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    networks:
+      - ai_dev_network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  # Grafana (Dashboards)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ai_dev_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - ai_dev_network
+
+  # MLflow (Tracking ML)
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: ai_dev_mlflow
+    ports:
+      - "5000:5000"
+    environment:
+      - BACKEND_STORE_URI=postgresql://aidev:aidev123@postgres:5432/mlflowdb
+      - DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
+    volumes:
+      - mlflow_data:/mlflow
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - ai_dev_network
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://aidev:aidev123@postgres:5432/mlflowdb --default-artifact-root /mlflow/artifacts
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  api_data:
+    driver: local
+  mlflow_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  ai_dev_network:
+    driver: bridge

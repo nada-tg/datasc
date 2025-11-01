@@ -1,0 +1,15 @@
+# Dockerfile.streamlit-personal - Dockerfile pour Personal Data Dashboard
+FROM python:3.10
+
+WORKDIR /app
+
+COPY requirements-streamlit.txt .
+RUN pip install --no-cache-dir -r requirements-streamlit.txt
+
+COPY personal_data_dashboard.py .
+
+RUN mkdir -p collected_data processed_data
+
+EXPOSE 8504
+
+CMD ["streamlit", "run", "personal_data_dashboard.py", "--server.port=8504", "--server.address=0.0.0.0"]

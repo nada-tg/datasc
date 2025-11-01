@@ -1,0 +1,16 @@
+# Dockerfile.deployment - Plateforme de Déploiement
+FROM python:3.10
+
+WORKDIR /app
+
+COPY requirements-deployment.txt .
+RUN pip install --no-cache-dir -r requirements-deployment.txt
+
+COPY deployment_platform.py .
+
+# Créer les dossiers nécessaires
+RUN mkdir -p deployed_models temp
+
+EXPOSE 8002
+
+CMD ["uvicorn", "deployment_platform:app", "--host", "0.0.0.0", "--port", "8002"]

@@ -1,0 +1,133 @@
+# version: '3.8'
+
+services:
+  # Base de données PostgreSQL (optionnel, pour production)
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: autosci
+      POSTGRES_USER: autosci_user
+      POSTGRES_PASSWORD: autosci_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - autosci-network
+
+  # MLflow Server
+  mlflow:
+    image: python:3.10
+    command: >
+      bash -c "
+        pip install mlflow psycopg2-binary &&
+        mlflow server 
+          --host 0.0.0.0 
+          --port 5000 
+          --backend-store-uri postgresql://autosci_user:autosci_pass@postgres:5432/autosci
+          --default-artifact-root ./mlruns
+      "
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/app/mlruns
+      - ./mlflow.db:/app/mlflow.db
+    depends_on:
+      - postgres
+    networks:
+      - autosci-network
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow.db
+
+  # API Principale AutoSci
+  autosci-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./mlruns:/app/mlruns
+      - ./mlflow.db:/app/mlflow.db
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - DATABASE_URL=postgresql://autosci_user:autosci_pass@postgres:5432/autosci
+    depends_on:
+      - mlflow
+      - postgres
+    networks:
+      - autosci-network
+
+  # Plateforme de Déploiement
+  deployment-platform:
+    build:
+      context: .
+      dockerfile: Dockerfile.deployment
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./deployed_models:/app/deployed_models
+      - ./deployment_platform.db:/app/deployment_platform.db
+    environment:
+      - AUTOSCI_API_URL=http://autosci-api:8000
+    depends_on:
+      - autosci-api
+    networks:
+      - autosci-network
+
+  # Dashboard Streamlit
+  streamlit-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./downloaded_models:/app/downloaded_models
+    environment:
+      - API_BASE_URL=http://autosci-api:8000
+      - DEPLOYMENT_PLATFORM_URL=http://deployment-platform:8002
+      - MLFLOW_URL=http://mlflow:5000
+    depends_on:
+      - autosci-api
+      - deployment-platform
+    networks:
+      - autosci-network
+
+  # Redis pour la gestion des sessions et cache
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - autosci-network
+
+  # Nginx pour le load balancing (optionnel)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - autosci-api
+      - deployment-platform
+      - streamlit-dashboard
+    networks:
+      - autosci-network
+
+networks:
+  autosci-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
