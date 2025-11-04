@@ -1,6 +1,6 @@
 """
 ultimate_lifecycle_frontend.py - Interface Streamlit Ultimate avec Animations
-Lancez avec: streamlit run ultimate_lifecycle_frontend.py
+Lancez avec: streamlit run ai_lifecycle_app.py
 
 Installation:
 pip install streamlit plotly pandas numpy requests streamlit-lottie streamlit-option-menu

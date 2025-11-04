@@ -2,6 +2,7 @@
 Interface Streamlit pour le Moteur de Conscience Artificielle
 Frontend complet pour créer, tester et analyser des consciences artificielles
 Version Avancée avec Projets, Agents IA, et Modèles
+streamlit run conscience_artificielle_app.py
 """
 
 import streamlit as st

@@ -2,7 +2,7 @@
 Moteur d'Accélérateur de Particules - IA Quantique
 Architecture complète pour créer, développer, fabriquer, tester et déployer
 des accélérateurs de particules avec simulations avancées
-uvicorn accelerateur_particules_api:app --host 0.0.0.0 --port 8000 --reload
+uvicorn accelerateur_particules_api:app --host 0.0.0.0 --port 8001 --reload
 """
 
 import numpy as np
